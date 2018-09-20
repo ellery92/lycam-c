@@ -36,14 +36,14 @@
 #include <arvenumtypes.h>
 #include <string.h>
 #include <stdlib.h>
-#if defined(LINUX)
-#include <linux/ip.h>
-#include <netinet/udp.h>
+#if defined(WIN32)
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #elif defined(__APPLE__)
 #include <netinet/udp.h>
 #else
-#include <winsock2.h>
-#include <ws2tcpip.h>
+#include <linux/ip.h>
+#include <netinet/udp.h>
 #endif
 
 static GObjectClass *parent_class = NULL;

@@ -302,14 +302,19 @@ main (int argc, char **argv)
 					printf ("%s (%s)\n", device_id, arv_get_device_address (i));
 					arv_tool_execute_command (argc, argv, device);
 
-                    ArvGcNode *feature;
-                    feature = arv_device_get_feature (device, "Width");
-					gint64 max_int64, min_int64;
-                    gint64 val = arv_gc_integer_get_value (ARV_GC_INTEGER (feature), NULL);
-                    min_int64 = arv_gc_integer_get_min (ARV_GC_INTEGER (feature), NULL);
-                    printf("width: %" G_GINT64_FORMAT "min: %" G_GINT64_FORMAT,
-                           val, min_int64);
-                    printf("\n");
+                    ArvCamera *camera;
+                    ArvBuffer *buffer;
+
+                    camera = arv_camera_new (device_id);
+                    buffer = arv_camera_acquisition (camera, 0);
+
+                    if (ARV_IS_BUFFER (buffer))
+                      printf ("Image successfully acquired\n");
+                    else
+                      printf ("Failed to acquire a single image\n");
+
+                    g_clear_object (&camera);
+                    g_clear_object (&buffer);
 
 					g_object_unref (device);
 				}

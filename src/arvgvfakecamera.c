@@ -30,9 +30,13 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #pragma comment (lib, "Ws2_32.lib")
+#define IFF_POINTTOPOINT IFF_POINTOPOINT
 #else
 #include <net/if.h>
 #include <ifaddrs.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
 #endif
 
 /**
@@ -435,7 +439,7 @@ arv_gv_fake_camera_start (ArvGvFakeCamera *gv_fake_camera)
 
 	for (ifap_iter = ifap ;ifap_iter != NULL && !interface_found; ifap_iter = ifap_iter->ai_next) {
 		if ((ifap_iter->ai_flags & IFF_UP) != 0 &&
-		    (ifap_iter->ai_flags & IFF_POINTTOPOINT) == 0 &&
+		    (ifap_iter->ai_flags & IFF_POINTOPOINT) == 0 &&
 		    (ifap_iter->ai_family == AF_INET) &&
 		    g_strcmp0 (ifap_iter->ai_canonname, gv_fake_camera->priv->interface_name) == 0) {
 			GSocketAddress *socket_address;
