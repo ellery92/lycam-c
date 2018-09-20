@@ -37,7 +37,13 @@
 #include <arvstr.h>
 #include <arvenumtypes.h>
 #include <string.h>
+#if defined(WIN32)
+#include <winsock2.h>
+// link with Ws2_32.lib
+#pragma comment (lib, "Ws2_32.lib")
+#else
 #include <sys/socket.h>
+#endif
 #include <stdio.h>
 #include <errno.h>
 
@@ -741,12 +747,27 @@ _loop (ArvGvStreamThreadData *thread_data)
 		else
 			timeout_ms = ARV_GV_STREAM_POLL_TIMEOUT_US / 1000;
 
+#ifdef WIN32
+        fd_set rfds;
+        struct timeval tv;
+
+        tv.tv_sec = 0;
+        tv.tv_usec = timeout_ms;
+
+        FD_ZERO(&rfds);
+        FD_SET(g_socket_get_fd (thread_data->socket), &rfds);
+
+        int retval = select(1, &rfds, NULL, NULL, &tv);
+        if (retval != -1 && retval)
+          n_events = 1;
+#else
 		n_events = g_poll (&poll_fd, 1, timeout_ms);
+#endif
 
 		g_get_current_time (&current_time);
 		time_us = current_time.tv_sec * 1000000 + current_time.tv_usec;
 
-		if (n_events > 0) {
+		if (n_events >= 0) {
 			read_count = g_socket_receive (thread_data->socket, (char *) packet,
 						       ARV_GV_STREAM_INCOMING_BUFFER_SIZE, NULL, NULL);
 
@@ -912,7 +933,20 @@ _ring_buffer_loop (ArvGvStreamThreadData *thread_data)
 		if ((descriptor->h1.block_status & TP_STATUS_USER) == 0) {
 			_check_frame_completion (thread_data, time_us, NULL);
 
+#ifdef WIN32
+            fd_set rfds;
+            struct timeval tv;
+
+            tv.tv_sec = 0;
+            tv.tv_usec = 100;
+
+            FD_ZERO(&rfds);
+            FD_SET(fd, &rfds);
+
+            int retval = select(1, &rfds, NULL, NULL, &tv);
+#else
 			g_poll (&poll_fd, 1, 100);
+#endif
 		} else {
 			ArvGvStreamFrameData *frame;
 			const struct tpacket3_hdr *header;

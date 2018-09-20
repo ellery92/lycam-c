@@ -23,7 +23,9 @@
 #ifndef ARV_H
 #define ARV_H
 
-/* #define ARV_H_INSIDE */
+#ifndef ARV_H_INSIDE
+#define ARV_H_INSIDE
+#endif
 
 #include <arvtypes.h>
 

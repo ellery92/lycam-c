@@ -7,6 +7,10 @@
 
 #include <arvtypes.h>
 
+#if defined(WIN32)
+typedef unsigned long pid_t;
+#endif
+
 G_BEGIN_DECLS
 
 gboolean	arv_make_thread_realtime 		(int priority);

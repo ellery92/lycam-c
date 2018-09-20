@@ -8,7 +8,7 @@
 #define ARAVIS_BUILD_GST_PLUGIN 1
 
 /* Build packet socket support */
-#define ARAVIS_BUILD_PACKET_SOCKET 1
+/* #define ARAVIS_BUILD_PACKET_SOCKET 0 */
 
 /* Build USB support */
 #define ARAVIS_BUILD_USB 1

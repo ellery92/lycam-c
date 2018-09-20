@@ -79,7 +79,7 @@ main (int argc, char **argv)
 	if (arv_gv_fake_camera_start (gv_camera)) {
 
 		while (!cancel)
-			sleep (1);
+			g_usleep (1);
 
 		arv_gv_fake_camera_stop (gv_camera);
 	} else

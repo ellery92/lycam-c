@@ -213,7 +213,11 @@ arv_tool_execute_command (int argc, char **argv, ArvDevice *device)
 
 static char *arv_option_device_name = NULL;
 static char *arv_option_device_address = NULL;
+#if 0
+static char *arv_option_debug_domains = "interface,device,chunk,stream,stream-thread,cp,sp,genicam,evaluator,misc,viewer";
+#else
 static char *arv_option_debug_domains = NULL;
+#endif
 
 static const GOptionEntry arv_option_entries[] =
 {
@@ -297,6 +301,15 @@ main (int argc, char **argv)
 				if (ARV_IS_DEVICE (device)) {
 					printf ("%s (%s)\n", device_id, arv_get_device_address (i));
 					arv_tool_execute_command (argc, argv, device);
+
+                    ArvGcNode *feature;
+                    feature = arv_device_get_feature (device, "Width");
+					gint64 max_int64, min_int64;
+                    gint64 val = arv_gc_integer_get_value (ARV_GC_INTEGER (feature), NULL);
+                    min_int64 = arv_gc_integer_get_min (ARV_GC_INTEGER (feature), NULL);
+                    printf("width: %" G_GINT64_FORMAT "min: %" G_GINT64_FORMAT,
+                           val, min_int64);
+                    printf("\n");
 
 					g_object_unref (device);
 				}

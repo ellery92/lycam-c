@@ -26,8 +26,14 @@
 #include <arvgvcp.h>
 #include <arvgvsp.h>
 #include <arvmisc.h>
+#if defined(WIN32)
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#pragma comment (lib, "Ws2_32.lib")
+#else
 #include <net/if.h>
 #include <ifaddrs.h>
+#endif
 
 /**
  * SECTION: arvgvfakecamera
@@ -272,7 +278,7 @@ _thread (void *user_data)
 				timeout_ms = 0;
 
 			n_events = g_poll (gv_fake_camera->priv->gvcp_fds, 2, timeout_ms);
-			if (n_events > 0) {
+			if (n_events >= 0) {
 				GSocketAddress *remote_address = NULL;
 				int count;
 
@@ -413,32 +419,32 @@ _thread (void *user_data)
 gboolean
 arv_gv_fake_camera_start (ArvGvFakeCamera *gv_fake_camera)
 {
-	struct ifaddrs *ifap = NULL;
-	struct ifaddrs *ifap_iter;
+	struct addrinfo *ifap = NULL;
+	struct addrinfo *ifap_iter;
 	int return_value;
 	gboolean interface_found = FALSE;
 	gboolean binding_error = FALSE;
 
 	g_return_val_if_fail (ARV_IS_GV_FAKE_CAMERA (gv_fake_camera), FALSE);
 
-	return_value = getifaddrs (&ifap);
+	return_value = getaddrinfo ("127.0.0.1", NULL, NULL, &ifap);
 	if (return_value < 0) {
 		arv_warning_device ("[GvFakeCamera::start] No network interface found");
 		return FALSE;
 	}
 
-	for (ifap_iter = ifap ;ifap_iter != NULL && !interface_found; ifap_iter = ifap_iter->ifa_next) {
-		if ((ifap_iter->ifa_flags & IFF_UP) != 0 &&
-		    (ifap_iter->ifa_flags & IFF_POINTOPOINT) == 0 &&
-		    (ifap_iter->ifa_addr->sa_family == AF_INET) &&
-		    g_strcmp0 (ifap_iter->ifa_name, gv_fake_camera->priv->interface_name) == 0) {
+	for (ifap_iter = ifap ;ifap_iter != NULL && !interface_found; ifap_iter = ifap_iter->ai_next) {
+		if ((ifap_iter->ai_flags & IFF_UP) != 0 &&
+		    (ifap_iter->ai_flags & IFF_POINTTOPOINT) == 0 &&
+		    (ifap_iter->ai_family == AF_INET) &&
+		    g_strcmp0 (ifap_iter->ai_canonname, gv_fake_camera->priv->interface_name) == 0) {
 			GSocketAddress *socket_address;
 			GSocketAddress *inet_socket_address;
 			GInetAddress *inet_address;
 			char *gvcp_address_string;
 			char *discovery_address_string;
 
-			socket_address = g_socket_address_new_from_native (ifap_iter->ifa_addr,
+			socket_address = g_socket_address_new_from_native (ifap_iter->ai_addr,
 									   sizeof (struct sockaddr));
 			inet_address = g_inet_socket_address_get_address (G_INET_SOCKET_ADDRESS (socket_address));
 			gvcp_address_string = g_inet_address_to_string (inet_address);
@@ -499,7 +505,7 @@ arv_gv_fake_camera_start (ArvGvFakeCamera *gv_fake_camera)
 		}
 	}
 
-	freeifaddrs (ifap);
+	freeaddrinfo (ifap);
 
 	if (binding_error) {
 		g_clear_object (&gv_fake_camera->priv->gvcp_socket);

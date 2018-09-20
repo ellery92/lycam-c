@@ -58,7 +58,7 @@ ArvInterfaceInfos interfaces[] = {
 	},
 #ifdef ARAVIS_BUILD_USB
 	{	.interface_id = "USB3Vision",
-		.is_available = TRUE,
+		.is_available = FALSE,
 		.get_interface_instance = arv_uv_interface_get_instance,
 		.destroy_interface_instance = arv_uv_interface_destroy_instance
 	},

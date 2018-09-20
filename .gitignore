@@ -1,1 +1,5 @@
 build
+build-vs
+/src/GPATH
+/src/GRTAGS
+/src/GTAGS

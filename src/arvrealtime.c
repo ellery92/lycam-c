@@ -31,11 +31,15 @@
 #include <arvdebug.h>
 #include <memory.h>
 #include <errno.h>
+#if defined(WIN32)
+#include <windows.h>
+#else
 #include <sched.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/resource.h>
 #include <sys/syscall.h>
+#endif
 
 #define RTKIT_SERVICE_NAME "org.freedesktop.RealtimeKit1"
 #define RTKIT_OBJECT_PATH "/org/freedesktop/RealtimeKit1"
@@ -219,7 +223,11 @@ arv_rtkit_make_high_priority (GDBusConnection *connection, pid_t thread, int nic
 #endif
 
 static pid_t _gettid(void) {
-        return (pid_t) syscall(SYS_gettid);
+#if defined(WIN32)
+    return (pid_t) GetCurrentThreadId();
+#else
+    return syscall(SYS_gettid);
+#endif
 }
 
 /**
@@ -234,7 +242,7 @@ static pid_t _gettid(void) {
  * Since: 0.4.0
  */
 
-#ifndef __APPLE__
+#if !defined(WIN32) && !defined( __APPLE__)
 gboolean
 arv_make_thread_realtime (int priority)
 {

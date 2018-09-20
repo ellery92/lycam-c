@@ -36,38 +36,68 @@
 #include <arvenumtypes.h>
 #include <string.h>
 #include <stdlib.h>
-#ifndef __APPLE__
+#if defined(LINUX)
 #include <linux/ip.h>
-#endif
 #include <netinet/udp.h>
+#elif defined(__APPLE__)
+#include <netinet/udp.h>
+#else
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#endif
 
 static GObjectClass *parent_class = NULL;
 
 /* Shared data (main thread - heartbeat) */
 
-#ifdef __APPLE__
+#if defined(__APPLE__) || defined(WIN32)
 struct iphdr
   {
-#if __BYTE_ORDER == __LITTLE_ENDIAN
+#if G_BYTE_ORDER == G_LITTLE_ENDIAN
     unsigned int ihl:4;
     unsigned int version:4;
-#elif __BYTE_ORDER == __BIG_ENDIAN
+#elif G_BYTE_ORDER == G_BIG_ENDIAN
     unsigned int version:4;
     unsigned int ihl:4;
 #else
 # error  "Please fix <bits/endian.h>"
 #endif
-    u_int8_t tos;
-    u_int16_t tot_len;
-    u_int16_t id;
-    u_int16_t frag_off;
-    u_int8_t ttl;
-    u_int8_t protocol;
-    u_int16_t check;
-    u_int32_t saddr;
-    u_int32_t daddr;
+    gint8 tos;
+    gint16 tot_len;
+    gint16 id;
+    gint16 frag_off;
+    gint8 ttl;
+    gint8 protocol;
+    gint16 check;
+    gint32 saddr;
+    gint32 daddr;
     /*The options start here. */
   };
+#endif
+
+#if defined(WIN32)
+/* UDP header as specified by RFC 768, August 1980. */
+
+struct udphdr
+{
+  union
+  {
+    struct
+    {
+      guint16 uh_sport;	/* source port */
+      guint16 uh_dport;	/* destination port */
+      guint16 uh_ulen;		/* udp length */
+      guint16 uh_sum;		/* udp checksum */
+    };
+    struct
+    {
+      guint16 source;
+      guint16 dest;
+      guint16 len;
+      guint16 check;
+    };
+  };
+};
 #endif
 
 typedef struct {
@@ -134,6 +164,35 @@ _flush_socket_buffer(ArvGvDeviceIOData *io_data)
 	}
 }
 
+#ifdef WIN32
+static gboolean
+_g_poll_win32(ArvGvDeviceIOData *io_data)
+{
+    gboolean success;
+    fd_set rfds;
+    struct timeval tv;
+
+    tv.tv_sec = 0;
+	tv.tv_usec = io_data->gvcp_timeout_ms * 50;
+
+    FD_ZERO(&rfds);
+    FD_SET(g_socket_get_fd (io_data->socket), &rfds);
+
+    int retval = select(1, &rfds, NULL, NULL, &tv);
+
+    if (retval == -1) {
+        /* error */
+        success = FALSE;
+    } else if (!retval) {
+        /* time out */
+        success = FALSE;
+    } else {
+        success = TRUE;
+    }
+    return success;
+}
+#endif
+
 static gboolean
 _read_memory (ArvGvDeviceIOData *io_data, guint64 address, guint32 size, void *buffer, GError **error)
 {
@@ -178,7 +237,11 @@ _read_memory (ArvGvDeviceIOData *io_data, guint64 address, guint32 size, void *b
 
 			do {
 				success = TRUE;
+#ifdef WIN32
+                success = _g_poll_win32(io_data);
+#else
 				success = success && g_poll (&io_data->poll_in_event, 1, timeout_ms) > 0;
+#endif
 				if (success)
 					count = g_socket_receive (io_data->socket, io_data->buffer,
 								  ARV_GV_DEVICE_BUFFER_SIZE, NULL, &local_error);
@@ -290,7 +353,11 @@ _write_memory (ArvGvDeviceIOData *io_data, guint64 address, guint32 size, void *
 
 			do {
 				success = TRUE;
+#ifdef WIN32
+                success = _g_poll_win32(io_data);
+#else
 				success = success && g_poll (&io_data->poll_in_event, 1, io_data->gvcp_timeout_ms) > 0;
+#endif
 				if (success)
 					count = g_socket_receive (io_data->socket, io_data->buffer,
 								  ARV_GV_DEVICE_BUFFER_SIZE, NULL, &local_error);
@@ -395,7 +462,11 @@ _read_register (ArvGvDeviceIOData *io_data, guint32 address, guint32 *value_plac
 
 			do {
 				success = TRUE;
+#ifdef WIN32
+                success = _g_poll_win32(io_data);
+#else
 				success = success && g_poll (&io_data->poll_in_event, 1, io_data->gvcp_timeout_ms) > 0;
+#endif
 				if (success)
 					count = g_socket_receive (io_data->socket, io_data->buffer,
 						  ARV_GV_DEVICE_BUFFER_SIZE, NULL, &local_error);
@@ -504,7 +575,11 @@ _write_register (ArvGvDeviceIOData *io_data, guint32 address, guint32 value, GEr
 
 			do {
 				success = TRUE;
+#ifdef WIN32
+                success = _g_poll_win32(io_data);
+#else
 				success = success && g_poll (&io_data->poll_in_event, 1, io_data->gvcp_timeout_ms) > 0;
+#endif
 				if (success)
 					count = g_socket_receive (io_data->socket, io_data->buffer,
 								  ARV_GV_DEVICE_BUFFER_SIZE, NULL, NULL);
@@ -798,7 +873,22 @@ arv_gv_device_auto_packet_size (ArvGvDevice *gv_device)
 			}
 
 			do {
+#ifdef WIN32
+                fd_set rfds;
+                struct timeval tv;
+
+                tv.tv_sec = 0;
+                tv.tv_usec = 10 * 1000;
+
+                FD_ZERO(&rfds);
+                FD_SET(g_socket_get_fd (socket), &rfds);
+
+                int retval = select(1, &rfds, NULL, NULL, &tv);
+                if (retval != -1 && retval)
+                    n_events = 1;
+#else
 				n_events = g_poll (&poll_fd, 1, 10);
+#endif
 				if (n_events != 0)
 					read_count = g_socket_receive (socket, buffer, 8192, NULL, NULL);
 				else

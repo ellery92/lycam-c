@@ -29,6 +29,10 @@
 #include <arvdebug.h>
 #include <arvmisc.h>
 #include <arvstr.h>
+#ifdef WIN32
+/* for msvc to find M_PI and M_E */
+#define _USE_MATH_DEFINES
+#endif
 #include <math.h>
 #include <stdlib.h>
 

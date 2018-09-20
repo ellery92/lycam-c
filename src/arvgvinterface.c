@@ -25,7 +25,9 @@
  * @short_description: GigEVision interface
  */
 
+#ifndef WIN32
 #include <arpa/inet.h>
+#endif
 #include <arvgvinterfaceprivate.h>
 #include <arvinterfaceprivate.h>
 #include <arvgvdeviceprivate.h>
@@ -36,10 +38,17 @@
 #include <glib/gprintf.h>
 #include <gio/gio.h>
 #include <sys/types.h>
+#if defined(WIN32)
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include "arvgetifaddrs_win32.h"
+#define IFF_POINTOPOINT IFF_POINTTOPOINT
+#else
 #include <sys/socket.h>
 #include <net/if.h>
 #include <netdb.h>
 #include <ifaddrs.h>
+#endif
 #include <stdlib.h>
 #include <string.h>
 
@@ -118,8 +127,9 @@ arv_gv_discover_socket_list_new (void)
 	socket_list->poll_fds = g_new (GPollFD, socket_list->n_sockets);
 	for (i = 0, iter = socket_list->sockets; iter != NULL; i++, iter = iter->next) {
 		ArvGvDiscoverSocket *discover_socket = iter->data;
+        int fd = g_socket_get_fd (discover_socket->socket);
 
-		socket_list->poll_fds[i].fd = g_socket_get_fd (discover_socket->socket);
+		socket_list->poll_fds[i].fd = fd;
 		socket_list->poll_fds[i].events =  G_IO_IN;
 		socket_list->poll_fds[i].revents = 0;
 	}
@@ -179,6 +189,7 @@ arv_gv_discover_socket_list_send_discover_packet (ArvGvDiscoverSocketList *socke
 			arv_warning_interface ("[ArvGVInterface::send_discover_packet] Error: %s", error->message);
 			g_error_free (error);
 		}
+
 		arv_gv_discover_socket_set_broadcast (discover_socket, FALSE);
 	}
 
@@ -315,19 +326,44 @@ _discover (GHashTable *devices, const char *device_id)
 
 	arv_gv_discover_socket_list_send_discover_packet (socket_list);
 
+#ifdef WIN32
+    fd_set rfds;
+    struct timeval tv = { 5, 0 };
+    int retval;
+    FD_ZERO(&rfds);
+    for (i = 0, iter = socket_list->sockets; iter != NULL; i++, iter = iter->next) {
+        ArvGvDiscoverSocket *discover_socket = iter->data;
+        int fd = g_socket_get_fd (discover_socket->socket);
+        FD_SET(fd, &rfds);
+    }
+#endif
+
 	do {
+#ifdef WIN32
+        int retval = select(socket_list->n_sockets, &rfds, NULL, NULL, &tv);
+        if (retval == -1) {
+            /* error */
+            arv_gv_discover_socket_list_free (socket_list);
+            return NULL;
+        } else if (!retval) {
+            /* time out */
+            arv_gv_discover_socket_list_free (socket_list);
+            return NULL;
+        }
+#else
 		if (g_poll (socket_list->poll_fds, socket_list->n_sockets, ARV_GV_INTERFACE_DISCOVERY_TIMEOUT_MS) == 0) {
-			arv_gv_discover_socket_list_free (socket_list);
-			return NULL;
+            arv_gv_discover_socket_list_free (socket_list);
+            return NULL;
 		}
+#endif
 
 		for (i = 0, iter = socket_list->sockets; iter != NULL; i++, iter = iter->next) {
 			ArvGvDiscoverSocket *discover_socket = iter->data;
 
 			do {
 				g_socket_set_blocking (discover_socket->socket, FALSE);
-				count = g_socket_receive (discover_socket->socket, buffer, ARV_GV_INTERFACE_SOCKET_BUFFER_SIZE,
-							  NULL, NULL);
+				count = g_socket_receive (discover_socket->socket,
+                         buffer, ARV_GV_INTERFACE_SOCKET_BUFFER_SIZE, NULL, NULL);
 				g_socket_set_blocking (discover_socket->socket, TRUE);
 
 				if (count > 0) {
@@ -390,7 +426,10 @@ _discover (GHashTable *devices, const char *device_id)
 				}
 			} while (count > 0);
 		}
-	} while (1);
+	} while (0);
+
+	arv_gv_discover_socket_list_free (socket_list);
+    return NULL;
 }
 
 static void
@@ -411,8 +450,9 @@ _device_infos_to_ginetaddress (ArvGvInterfaceDeviceInfos *device_infos)
 	return device_address;
 }
 
+
 static void
-arv_gv_interface_update_device_list (ArvInterface *interface, GArray *device_ids)
+arv_gv_interface_update_device_list (struct _ArvInterface *iface, GArray *device_ids)
 {
 	ArvGvInterface *gv_interface;
 	GHashTableIter iter;
@@ -420,7 +460,7 @@ arv_gv_interface_update_device_list (ArvInterface *interface, GArray *device_ids
 
 	g_assert (device_ids->len == 0);
 
-	gv_interface = ARV_GV_INTERFACE (interface);
+	gv_interface = ARV_GV_INTERFACE (iface);
 
 	arv_gv_interface_discover (gv_interface);
 
@@ -487,13 +527,38 @@ arv_gv_interface_camera_locate (ArvGvInterface *gv_interface, GInetAddress *devi
 
 	arv_gvcp_packet_free (packet);
 
+#ifdef WIN32
+    fd_set rfds;
+    struct timeval tv = { 5, 0 };
+    int retval;
+    FD_ZERO(&rfds);
+    for (i = 0, iter = socket_list->sockets; iter != NULL; i++, iter = iter->next) {
+        ArvGvDiscoverSocket *discover_socket = iter->data;
+        int fd = g_socket_get_fd (discover_socket->socket);
+        FD_SET(fd, &rfds);
+    }
+#endif
+
 	do {
 		/* Now parse the result */
+#ifdef WIN32
+        int retval = select(socket_list->n_sockets, &rfds, NULL, NULL, &tv);
+        if (retval == -1) {
+            /* error */
+            arv_gv_discover_socket_list_free (socket_list);
+            return NULL;
+        } else if (!retval) {
+            /* time out */
+            arv_gv_discover_socket_list_free (socket_list);
+            return NULL;
+        }
+#else
 		if (g_poll (socket_list->poll_fds, socket_list->n_sockets,
-					ARV_GV_INTERFACE_DISCOVERY_TIMEOUT_MS) == 0) {
+					ARV_GV_INTERFACE_DISCOVERY_TIMEOUT_MS) < 0) {
 			arv_gv_discover_socket_list_free (socket_list);
 			return NULL;
 		}
+#endif
 
 		for (i = 0, iter = socket_list->sockets; iter != NULL; i++, iter = iter->next) {
 			ArvGvDiscoverSocket *socket = iter->data;
@@ -526,14 +591,14 @@ arv_gv_interface_camera_locate (ArvGvInterface *gv_interface, GInetAddress *devi
 }
 
 static ArvDevice *
-_open_device (ArvInterface *interface, GHashTable *devices, const char *device_id)
+_open_device (ArvInterface *iface, GHashTable *devices, const char *device_id)
 {
 	ArvGvInterface *gv_interface;
 	ArvDevice *device = NULL;
 	ArvGvInterfaceDeviceInfos *device_infos;
 	GInetAddress *device_address;
 
-	gv_interface = ARV_GV_INTERFACE (interface);
+	gv_interface = ARV_GV_INTERFACE (iface);
 
 	if (device_id == NULL) {
 		GList *device_list;
@@ -595,12 +660,12 @@ _open_device (ArvInterface *interface, GHashTable *devices, const char *device_i
 }
 
 static ArvDevice *
-arv_gv_interface_open_device (ArvInterface *interface, const char *device_id)
+arv_gv_interface_open_device (ArvInterface *iface, const char *device_id)
 {
 	ArvDevice *device;
 	ArvGvInterfaceDeviceInfos *device_infos;
 
-	device = _open_device (interface, ARV_GV_INTERFACE (interface)->priv->devices, device_id);
+	device = _open_device (iface, ARV_GV_INTERFACE (iface)->priv->devices, device_id);
 	if (ARV_IS_DEVICE (device))
 		return device;
 
