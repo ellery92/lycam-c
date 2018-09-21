@@ -30,7 +30,7 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #pragma comment (lib, "Ws2_32.lib")
-#define IFF_POINTTOPOINT IFF_POINTOPOINT
+#define IFF_POINTOPOINT IFF_POINTTOPOINT
 #else
 #include <net/if.h>
 #include <ifaddrs.h>

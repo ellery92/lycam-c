@@ -47,7 +47,7 @@
 #include <stdio.h>
 #include <errno.h>
 
-#ifdef ARAVIS_BUILD_PACKET_SOCKET
+#if defined(ARAVIS_BUILD_PACKET_SOCKET) && !defined(WIN32)
 #include <ifaddrs.h>
 #include <netinet/udp.h>
 #include <net/if.h>
@@ -726,7 +726,11 @@ _loop (ArvGvStreamThreadData *thread_data)
 {
 	ArvGvStreamFrameData *frame;
 	ArvGvspPacket *packet;
+#ifdef WIN32
+    struct pollfd poll_fd;
+#else
 	GPollFD poll_fd;
+#endif
 	GTimeVal current_time;
 	guint64 time_us;
 	size_t read_count;
@@ -735,9 +739,24 @@ _loop (ArvGvStreamThreadData *thread_data)
 
 	arv_debug_stream ("[GvStream::loop] Standard socket method");
 
+#ifdef WIN32
+	poll_fd.fd = g_socket_get_fd (thread_data->socket);
+	poll_fd.events =  POLLIN;
+	poll_fd.revents = 0;
+
+    /* for windows and sony camera, must send_to first, don't know why yet */
+	GSocketAddress *stream_socket_address = g_inet_socket_address_new
+      (thread_data->device_address, thread_data->source_stream_port);
+
+    if (!(g_socket_send_to(thread_data->socket, stream_socket_address,
+                           "Hello", 5, NULL, NULL)))
+          arv_debug_stream("send hello to stream error");
+    g_clear_object(&stream_socket_address);
+#else
 	poll_fd.fd = g_socket_get_fd (thread_data->socket);
 	poll_fd.events =  G_IO_IN;
 	poll_fd.revents = 0;
+#endif
 
 	packet = g_malloc0 (ARV_GV_STREAM_INCOMING_BUFFER_SIZE);
 
@@ -748,18 +767,7 @@ _loop (ArvGvStreamThreadData *thread_data)
 			timeout_ms = ARV_GV_STREAM_POLL_TIMEOUT_US / 1000;
 
 #ifdef WIN32
-        fd_set rfds;
-        struct timeval tv;
-
-        tv.tv_sec = 0;
-        tv.tv_usec = timeout_ms;
-
-        FD_ZERO(&rfds);
-        FD_SET(g_socket_get_fd (thread_data->socket), &rfds);
-
-        int retval = select(1, &rfds, NULL, NULL, &tv);
-        if (retval != -1 && retval)
-          n_events = 1;
+        n_events = WSAPoll(&poll_fd, 1, timeout_ms);
 #else
 		n_events = g_poll (&poll_fd, 1, timeout_ms);
 #endif
@@ -767,7 +775,7 @@ _loop (ArvGvStreamThreadData *thread_data)
 		g_get_current_time (&current_time);
 		time_us = current_time.tv_sec * 1000000 + current_time.tv_usec;
 
-		if (n_events >= 0) {
+		if (n_events > 0) {
 			read_count = g_socket_receive (thread_data->socket, (char *) packet,
 						       ARV_GV_STREAM_INCOMING_BUFFER_SIZE, NULL, NULL);
 

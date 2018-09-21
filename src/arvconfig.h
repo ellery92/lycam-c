@@ -8,7 +8,7 @@
 #define ARAVIS_BUILD_GST_PLUGIN 1
 
 /* Build packet socket support */
-/* #define ARAVIS_BUILD_PACKET_SOCKET 0 */
+/* #define ARAVIS_BUILD_PACKET_SOCKET  */
 
 /* Build USB support */
 #define ARAVIS_BUILD_USB 1
@@ -17,7 +17,7 @@
 #define ARAVIS_BUILD_VIEWER 1
 
 /* Build with a much fast heartbeat rate */
-/* #undef ARAVIS_FAST_HEARTBEAT */
+/* #define ARAVIS_FAST_HEARTBEAT */
 
 /* always defined to indicate that i18n is enabled */
 #define ENABLE_NLS 1

@@ -808,7 +808,11 @@ arv_gv_device_auto_packet_size (ArvGvDevice *gv_device)
 	GInetAddress *interface_address;
 	GSocketAddress *interface_socket_address;
 	GInetSocketAddress *local_address;
+#ifdef WIN32
+    struct pollfd poll_fd;
+#else
 	GPollFD poll_fd;
+#endif
 	const guint8 *address_bytes;
 	guint16 port;
 	gboolean do_not_fragment;
@@ -847,9 +851,15 @@ arv_gv_device_auto_packet_size (ArvGvDevice *gv_device)
 	do_not_fragment = arv_device_get_boolean_feature_value (device, "GevSCPSDoNotFragment");
 	arv_device_set_boolean_feature_value (device, "GevSCPSDoNotFragment", TRUE);
 
+#ifdef WIN32
+	poll_fd.fd = g_socket_get_fd (socket);
+	poll_fd.events =  POLLIN;
+	poll_fd.revents = 0;
+#else
 	poll_fd.fd = g_socket_get_fd (socket);
 	poll_fd.events =  G_IO_IN;
 	poll_fd.revents = 0;
+#endif
 
 	current_size = 1500;
 	max_size = 16384;
@@ -874,22 +884,11 @@ arv_gv_device_auto_packet_size (ArvGvDevice *gv_device)
 
 			do {
 #ifdef WIN32
-                fd_set rfds;
-                struct timeval tv;
-
-                tv.tv_sec = 0;
-                tv.tv_usec = 10 * 1000;
-
-                FD_ZERO(&rfds);
-                FD_SET(g_socket_get_fd (socket), &rfds);
-
-                int retval = select(1, &rfds, NULL, NULL, &tv);
-                if (retval != -1 && retval)
-                    n_events = 1;
+                n_events = WSAPoll(&poll_fd, 1, 10);
 #else
 				n_events = g_poll (&poll_fd, 1, 10);
 #endif
-				if (n_events != 0)
+				if (n_events > 0)
 					read_count = g_socket_receive (socket, buffer, 8192, NULL, NULL);
 				else
 					read_count = 0;
