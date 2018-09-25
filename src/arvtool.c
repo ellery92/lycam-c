@@ -296,22 +296,16 @@ main (int argc, char **argv)
 		if (n_devices > 0) {
 			for (i = 0; i < n_devices; i++) {
 				device_id = arv_get_device_id (i);
+
+#if 1
                 ArvCamera *camera;
                 ArvBuffer *buffer;
 
                 camera = arv_camera_new (device_id);
-                /* for (int i = 9; i >= 1; i--) { */
-                /*   int packet_size = i * 8192; */
-                /*   arv_camera_gv_set_packet_size(camera, packet_size); */
-                /*   if (arv_camera_gv_get_packet_size(camera) == packet_size) { */
-                /*     printf("%d\n", packet_size); */
-                /*     break; */
-                /*   } */
-                /* } */
                 ArvDevice *device = arv_camera_get_device(camera);
                 arv_device_set_boolean_feature_value (device, "GevSCPSDoNotFragment", 1);
                 arv_camera_gv_set_packet_size(camera, 8192);
-				buffer = arv_camera_acquisition(camera, 50000);
+				buffer = arv_camera_acquisition(camera, 500000);
 
                 if (ARV_IS_BUFFER (buffer))
                     printf ("Image successfully acquired\n");
@@ -320,24 +314,17 @@ main (int argc, char **argv)
 
                 g_clear_object (&camera);
                 g_clear_object (&buffer);
+#else
 
-				/* device = arv_open_device (device_id); */
-                /* arv_device_execute_command(ARV_DEVICE (device), "AcquisitionStop"); */
+				device = arv_open_device (device_id);
 
-				/* if (ARV_IS_DEVICE (device)) { */
-				/* 	printf ("%s (%s)\n", device_id, arv_get_device_address (i)); */
-				/* 	arv_tool_execute_command (argc, argv, device); */
+				if (ARV_IS_DEVICE (device)) {
+					printf ("%s (%s)\n", device_id, arv_get_device_address (i));
+					arv_tool_execute_command (argc, argv, device);
 
-                /*     ArvBuffer *buffer; */
-                /*     ArvStream *stream = arv_device_create_stream(device, NULL, NULL); */
-                /*     int payload = arv_device_get_integer_feature_value(device, "PayloadSize"); */
-                /*     arv_stream_push_buffer(stream, arv_buffer_new(payload, NULL)); */
-                /*     arv_device_set_string_feature_value (device, "AcquisitionMode", */
-                /*                                          arv_acquisition_mode_to_string (ARV_ACQUISITION_MODE_SINGLE_FRAME)); */
-                /*     arv_device_execute_command (device, "AcquisitionStart"); */
-
-				/* 	g_object_unref (device); */
-				/* } */
+					g_object_unref (device);
+				}
+#endif
 			}
 		} else {
 			fprintf (stderr, "No device found\n");

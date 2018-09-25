@@ -172,7 +172,7 @@ _g_poll_win32(ArvGvDeviceIOData *io_data)
     fd_set rfds;
     struct timeval tv;
 
-    tv.tv_sec = 0;
+    tv.tv_sec = 1;
 	tv.tv_usec = io_data->gvcp_timeout_ms * 50;
 
     FD_ZERO(&rfds);

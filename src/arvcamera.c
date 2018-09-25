@@ -714,7 +714,7 @@ arv_camera_acquisition (ArvCamera *camera, guint64 timeout)
 	stream = arv_camera_create_stream (camera, NULL, NULL);
 	payload = arv_camera_get_payload (camera);
 	arv_stream_push_buffer (stream,  arv_buffer_new (payload, NULL));
-	arv_camera_set_acquisition_mode (camera, ARV_ACQUISITION_MODE_SINGLE_FRAME);
+	arv_camera_set_acquisition_mode (camera, ARV_ACQUISITION_MODE_MULTI_FRAME);
 	arv_camera_start_acquisition (camera);
     if (timeout > 0) {
         buffer = arv_stream_timeout_pop_buffer (stream, timeout);

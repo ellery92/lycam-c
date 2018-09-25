@@ -738,6 +738,7 @@ _loop (ArvGvStreamThreadData *thread_data)
 	int n_events;
 
 	arv_debug_stream ("[GvStream::loop] Standard socket method");
+	packet = g_malloc0 (ARV_GV_STREAM_INCOMING_BUFFER_SIZE);
 
 #ifdef WIN32
 	poll_fd.fd = g_socket_get_fd (thread_data->socket);
@@ -757,8 +758,6 @@ _loop (ArvGvStreamThreadData *thread_data)
 	poll_fd.events =  G_IO_IN;
 	poll_fd.revents = 0;
 #endif
-
-	packet = g_malloc0 (ARV_GV_STREAM_INCOMING_BUFFER_SIZE);
 
 	do {
 		if (thread_data->frames != NULL)
@@ -1148,7 +1147,12 @@ arv_gv_stream_new (ArvGvDevice *gv_device,
 	address_bytes = g_inet_address_to_bytes (interface_address);
 	arv_device_set_integer_feature_value (ARV_DEVICE (gv_device), "GevSCDA", g_htonl (*((guint32 *) address_bytes)));
 	arv_device_set_integer_feature_value (ARV_DEVICE (gv_device), "GevSCPHostPort", thread_data->stream_port);
+    thread_data->source_stream_port = 0;
 	thread_data->source_stream_port = arv_device_get_integer_feature_value (ARV_DEVICE (gv_device), "GevSCSP");
+    if (thread_data->source_stream_port == 0) {
+        arv_warning_stream("[GvStream::stream_new] invalid source stream port 0, set port to stream port");
+        thread_data->source_stream_port = thread_data->stream_port;
+    }
 
 	arv_debug_stream ("[GvStream::stream_new] Destination stream port = %d", thread_data->stream_port);
 	arv_debug_stream ("[GvStream::stream_new] Source stream port = %d", thread_data->source_stream_port);
