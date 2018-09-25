@@ -5,7 +5,7 @@ if (NOT WIN32)
   list(REMOVE_ITEM lycam-c-SRCS ${CMAKE_CURRENT_LIST_DIR}/arvgetifaddrs_win32.c)
 endif()
 
-option(BUILD_DLL "OFF")
+option(BUILD_DLL ON)
 if(BUILD_DLL)
   add_library(lycam-c SHARED ${lycam-c-SRCS})
 else()
@@ -95,3 +95,13 @@ else()
   target_include_directories(lycam-c PRIVATE ${LIBUSB_INCLUDE_DIRS})
   target_link_libraries(lycam-c PRIVATE ${LIBUSB_LDFLAGS})
 endif()
+
+install(TARGETS lycam-c
+  RUNTIME DESTINATION bin
+  LIBRARY DESTINATION lib
+  ARCHIVE DESTINATION lib/static)
+install(FILES
+  "lyucamera.h"
+  DESTINATION include)
+
+message("install prefix: ${CMAKE_INSTALL_PREFIX}")
