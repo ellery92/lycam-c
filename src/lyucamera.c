@@ -3,8 +3,10 @@
 #include "arvsystem.h"
 #include "arvbuffer.h"
 
+static char *arv_option_debug_domains = "interface,device,chunk,stream,stream-thread,cp,sp,genicam,evaluator,misc,viewer";
+
 #define MAX_CAMERAS 16
-#define BUFFER_DEFAULT 5
+#define BUFFER_DEFAULT 8
 
 struct LyuCamera {
     int index;
@@ -14,6 +16,9 @@ struct LyuCamera {
     LyuStreamCallback stream_cb;
     void *user_data;
     int nbuffer;
+
+    GThread *thread;
+    gboolean cancel;
 } cameras[MAX_CAMERAS];
 static int ncamera;
 
@@ -36,6 +41,7 @@ lyu_get_lyucamera_at(int index)
 int
 lyu_count_cameras()
 {
+    arv_debug_enable(arv_option_debug_domains);
     arv_update_device_list();
     ncamera = arv_get_n_devices();
     if (ncamera > MAX_CAMERAS)
@@ -291,12 +297,30 @@ lyu_camera_get_available_pixel_formats_as_display_names	(int index, uint32_t *n_
 static void
 _ArvStreamCallback	(void *user_data, ArvStreamCallbackType type, ArvBuffer *buffer)
 {
-    struct LyuCamera *lcam = (struct LyuCamera *)user_data;
-    if (arv_buffer_get_status(buffer) == ARV_BUFFER_STATUS_SUCCESS) {
-        if (lcam->stream_cb) {
-            lcam->stream_cb(lcam->index, buffer, lcam->user_data);
+    if (type == ARV_STREAM_CALLBACK_TYPE_INIT) {
+        if (!arv_make_thread_realtime (10) &&
+            !arv_make_thread_high_priority (-10))
+            g_warning ("Failed to make stream thread high priority");
+    }
+}
+
+static void *
+lyu_stream_thread(void *data)
+{
+    struct LyuCamera *lcam = (struct LyuCamera *)data;
+    while (!g_atomic_int_get (&lcam->cancel)) {
+        ArvBuffer *buffer = arv_stream_timeout_pop_buffer (lcam->stream, 80000);
+        if (buffer) {
+            if (ARV_IS_BUFFER(buffer)
+                && arv_buffer_get_status(buffer) == ARV_BUFFER_STATUS_SUCCESS) {
+                if (lcam->stream_cb)
+                    lcam->stream_cb(lcam->index, buffer, lcam->user_data);
+            }
+            arv_stream_push_buffer(lcam->stream, buffer);
         }
     }
+
+    return NULL;
 }
 
 void
@@ -311,14 +335,15 @@ lyu_camera_start_acquisition		(int index, LyuStreamCallback cb, void *user_data)
     lcam->stream_cb = cb;
     lcam->stream = arv_camera_create_stream(cam, _ArvStreamCallback, lcam);
 
-    if (cb == NULL) {
-        int payload = arv_camera_get_payload (cam);
-        lcam->nbuffer = BUFFER_DEFAULT;
+    int payload = arv_camera_get_payload (cam);
+    lcam->nbuffer = BUFFER_DEFAULT;
 
-        int nbuffer = lcam->nbuffer;
-        while (nbuffer--)
-            arv_stream_push_buffer (lcam->stream,  arv_buffer_new (payload, NULL));
-    }
+    int nbuffer = lcam->nbuffer;
+    while (nbuffer--)
+        arv_stream_push_buffer (lcam->stream,  arv_buffer_new (payload, NULL));
+
+    lcam->cancel = FALSE;
+    lcam->thread = g_thread_new("ly_cam_stream", lyu_stream_thread, lcam);
 
     arv_camera_start_acquisition(cam);
 }
@@ -329,9 +354,13 @@ lyu_camera_stop_acquisition		(int index)
     ArvCamera *cam = lyu_get_camera_at(index);
     if (!cam)
         return;
+
     arv_camera_stop_acquisition(cam);
 
     struct LyuCamera *lcam = lyu_get_lyucamera_at(index);
+    g_atomic_int_set (&lcam->cancel, TRUE);
+    g_thread_join (lcam->thread);
+
     lcam->stream_cb = 0;
     g_object_unref(lcam->stream);
 }
@@ -361,7 +390,11 @@ LyuBuffer *	lyu_camera_acquisition			(int index, uint64_t timeout)
 
     if (buffer)
         arv_stream_push_buffer(lcam->stream, buffer);
-    return buffer;
+
+    if (arv_buffer_get_status(buffer) == ARV_BUFFER_STATUS_SUCCESS)
+        return buffer;
+
+    return NULL;
 }
 
 void

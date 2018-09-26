@@ -766,7 +766,7 @@ _loop (ArvGvStreamThreadData *thread_data)
 			timeout_ms = ARV_GV_STREAM_POLL_TIMEOUT_US / 1000;
 
 #ifdef WIN32
-        n_events = WSAPoll(&poll_fd, 1, timeout_ms);
+		n_events = WSAPoll(&poll_fd, 1, timeout_ms);
 #else
 		n_events = g_poll (&poll_fd, 1, timeout_ms);
 #endif

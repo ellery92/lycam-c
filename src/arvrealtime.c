@@ -286,6 +286,14 @@ arv_make_thread_realtime (int priority)
 	}
 	return TRUE;
 }
+#elif defined(WIN32)
+gboolean
+arv_make_thread_realtime (int priority)
+{
+    if(SetPriorityClass(GetCurrentProcess(), REALTIME_PRIORITY_CLASS))
+        return TRUE;
+    return FALSE;
+}
 #else
 gboolean
 arv_make_thread_realtime (int priority)
@@ -307,6 +315,15 @@ arv_make_thread_realtime (int priority)
  * Since: 0.4.0
  */
 
+#ifdef WIN32
+gboolean
+arv_make_thread_high_priority (int nice_level)
+{
+    if(SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL))
+        return TRUE;
+    return FALSE;
+}
+#else
 gboolean
 arv_make_thread_high_priority (int nice_level)
 {
@@ -333,3 +350,4 @@ arv_make_thread_high_priority (int nice_level)
 
 	return TRUE;
 }
+#endif
