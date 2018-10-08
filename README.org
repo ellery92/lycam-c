@@ -1,10 +1,10 @@
 * What is lycam-c
   lycam-c add support for win32 from [[https://github.com/AravisProject/aravis][Aravis project]].
 * Dependency
-** glib
-** libusb-2.0
-** zlib
-** libxml2
+ + glib
+ + libusb-2.0
+ + zlib
+ + libxml2
 * Build
  You need to use cmake to build the project, and give dependencies' path, cmake-gui is
 recommended.
