@@ -775,6 +775,7 @@ _loop (ArvGvStreamThreadData *thread_data)
 		time_us = current_time.tv_sec * 1000000 + current_time.tv_usec;
 
 		if (n_events > 0) {
+			// read_count = g_socket_receive_from(thread_data->socket, NULL, (char*)packet, ARV_GV_STREAM_INCOMING_BUFFER_SIZE, NULL, NULL);
 			read_count = g_socket_receive (thread_data->socket, (char *) packet,
 						       ARV_GV_STREAM_INCOMING_BUFFER_SIZE, NULL, NULL);
 
@@ -1152,6 +1153,10 @@ arv_gv_stream_new (ArvGvDevice *gv_device,
     if (thread_data->source_stream_port == 0) {
         arv_warning_stream("[GvStream::stream_new] invalid source stream port 0, set port to stream port");
         thread_data->source_stream_port = thread_data->stream_port;
+		const char *model;
+		model = arv_device_get_string_feature_value(ARV_DEVICE(gv_device), "DeviceModelName");
+		if (strcmp(model, "MV-CA060-11GM") == 0)
+		  thread_data->source_stream_port = 9001;
     }
 
 	arv_debug_stream ("[GvStream::stream_new] Destination stream port = %d", thread_data->stream_port);

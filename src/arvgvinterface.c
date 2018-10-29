@@ -384,8 +384,10 @@ _discover (GHashTable *devices, const char *device_id)
 												  data);
 						address_string = g_inet_address_to_string (interface_address);
 
-						arv_debug_interface ("[GvInterface::discovery] Device '%s' found "
+						arv_debug_interface ("[GvInterface::discovery] Model: '%s', Vendor: '%s' Device '%s' found "
 								     "(interface %s) user_id '%s' - MAC '%s'",
+									 device_infos->model,
+							         device_infos->vendor,
 								     device_infos->id,
 								     address_string,
 								     device_infos->user_id,
